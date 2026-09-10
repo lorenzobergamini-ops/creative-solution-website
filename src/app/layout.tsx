@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import Header from "@/components/Header";
@@ -28,6 +28,9 @@ export const metadata: Metadata = {
   },
   description:
     "Creative Solution — stampa 3D su richiesta, pezzi personalizzati, prototipi e progettazione. Richiedi un preventivo personalizzato.",
+};
+
+export const viewport: Viewport = {
   themeColor: "#131313",
 };
 
