@@ -4,11 +4,13 @@ Sito ufficiale di **Creative Solution**, brand italiano di stampa 3D e contenuti
 maker/tecnologici. Repository del sito pubblico (home, servizi, galleria), form
 preventivo con upload file 3D, email di notifica e pannello admin privato.
 
-> **Stato attuale: pagine pubbliche (fase M1).** Home, Servizi, Come funziona,
-> Contatti e Privacy sono implementate con il design system, header/footer
-> condivisi e `src/lib/site-settings.ts` (default configurabili). Mancano:
-> galleria collegata al database (M2), form preventivo (M3), email (M4) e
-> pannello admin (M5).
+> **Stato attuale: galleria collegata a Supabase (fase M2).** Le pagine
+> pubbliche (home, servizi, come funziona, contatti, privacy) e la galleria
+> pubblica (griglia, filtri per categoria, pagina dettaglio con lightbox
+> accessibile, sezione "Lavori recenti" in home) leggono i progetti
+> pubblicati da Supabase con fallback grazioso se le credenziali non sono
+> configurate. Mancano: form preventivo (M3), email (M4) e pannello admin
+> (M5).
 
 ## Stack
 
@@ -30,20 +32,29 @@ preventivo con upload file 3D, email di notifica e pannello admin privato.
 ├── .env.example            # template variabili d'ambiente (committato)
 ├── public/                 # asset statici
 ├── src/
-│   └── app/
-│       ├── globals.css     # design system (CSS variables + Tailwind)
-│       ├── layout.tsx      # root layout: font, metadati, accent override
-│       └── page.tsx        # placeholder (fondamenta)
+│   ├── app/
+│   │   ├── globals.css     # design system (CSS variables + Tailwind)
+│   │   ├── layout.tsx      # root layout: font, metadati, accent override
+│   │   ├── page.tsx        # home (incl. "Lavori recenti" da Supabase)
+│   │   ├── galleria/
+│   │   │   ├── page.tsx    # griglia progetti + filtri categoria
+│   │   │   └── [slug]/page.tsx  # dettaglio progetto + lightbox
+│   │   └── …               # servizi, come-funziona, contatti, privacy
+│   ├── components/
+│   │   ├── gallery/        # card, lightbox, filtri, empty state
+│   │   └── …               # ui.tsx, Header, Footer, icons
+│   ├── lib/
+│   │   ├── supabase/       # client browser + client server (letture pubbliche)
+│   │   ├── gallery.ts      # accesso dati galleria (M2)
+│   │   └── site-settings.ts
 ├── supabase/
-│   └── migrations/
-│       └── 0001_init.sql   # schema iniziale: enum, tabelle, RLS, bucket
+│   ├── migrations/
+│   │   └── 0001_init.sql   # schema iniziale: enum, tabelle, RLS, bucket
+│   └── seed_demo.sql       # DATI DI ESEMPIO (da eliminare in produzione)
 ├── tailwind.config.ts      # mappa i colori/font alle CSS variables
 ├── postcss.config.mjs
 └── package.json
 ```
-
-Le pagine di contenuto arriveranno in `src/app` nelle fasi successive
-(M1 pubblico, M2 galleria, M3 form preventivo, M5 pannello admin).
 
 ## Setup e variabili d'ambiente
 
@@ -135,8 +146,54 @@ Tutte le scelte non specificate nel brief, con motivazione.
   directory reali su `/home` e riempie la partizione (verificato su questo
   ambiente).
 
-## Nota sul database come applicarlo (Fase M0)
+## Galleria pubblica (fase M2)
 
-La migrazione `supabase/migrations/0001_init.sql` va applicata al progetto
-Supabase (dashboard SQL editor oppure `supabase db push` con la CLI).
-I bucket storage e le policy RLS sono inclusi nella migrazione stessa.
+- La galleria legge `gallery_projects` + `gallery_images` **solo pubblicati**
+  (`is_published = true`), tramite RLS (policy `select` per anon/authenticated).
+- Client Supabase: `src/lib/supabase/server.ts` (letture pubbliche con anon key,
+  nessun cookie → le pagine restano prerenderizzate con ISR) e
+  `src/lib/supabase/client.ts` (client browser, base per le fasi admin).
+  La service role key vive solo in variabili d'ambiente server: **mai** nel
+  client o nel repo.
+- **Fallback grazioso**: senza `NEXT_PUBLIC_SUPABASE_URL` /
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY` non viene creato alcun client e le funzioni
+  di `src/lib/gallery.ts` restituiscono liste vuote: la build passa anche in
+  CI senza credenziali e la UI mostra l'empty state onesto
+  "Nessun progetto pubblicato ancora".
+- Immagini: bucket storage pubblico `gallery`, URL
+  `${NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/gallery/<path>`.
+  `next.config.ts` autorizza i domini `*.supabase.co` / `*.supabase.in` per
+  `next/image`. Se un'immagine manca o non carica, la UI mostra il placeholder
+  onesto "Immagine in attesa" — mai URL esterni casuali.
+- ISR: le pagine della galleria sono rigenerate ogni 5 minuti
+  (`export const revalidate = 300`): i progetti pubblicati dal pannello admin
+  appaiono senza bisogno di redeploy.
+
+## Database: migrazioni e seed
+
+**Migrazione** — `supabase/migrations/0001_init.sql` crea enum, tabelle,
+trigger, indici, policy RLS e bucket storage (in modo idempotente).
+Modo 1 (dashboard Supabase): progetto → **SQL Editor** → incolla il contenuto
+del file → **Run**. Modo 2 (Supabase CLI), dalla cartella del repo con il
+progetto linkato:
+
+```bash
+supabase db push          # applica le migrazioni (deploy preview / remote)
+supabase start            # avvia lo stack locale
+supabase db reset         # applica le migrazioni al DB locale
+```
+
+**Seed demo** — `supabase/seed_demo.sql` inserisce 4 progetti dimostrativi
+(titoli con suffisso " (Esempio)", descrizioni segnaposto esplicite e
+immagini inesistenti che mostrano "Immagine in attesa"): serve a vedere
+griglia, filtri e lightbox durante lo sviluppo. È **DATI DI ESEMPIO**:
+applicarlo solo in ambienti di sviluppo/demo, **mai in produzione**.
+
+```bash
+# Applicare il seed (SQL Editor della dashboard, oppure):
+supabase db push
+
+# Rimuovere il seed (per ripartire puliti o in produzione):
+#   delete from public.gallery_images;
+#   delete from public.gallery_projects;
+```
