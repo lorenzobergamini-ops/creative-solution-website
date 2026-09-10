@@ -50,4 +50,57 @@
   h6 {
     font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   }
+
+  ::selection {
+    background: var(--accent);
+    color: #131313;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Decorazioni tecniche (pattern legati al mondo 3D)                   */
+/* Sottili, un solo accent color, nessun effetto glass/neon.           */
+/* ------------------------------------------------------------------ */
+@layer utilities {
+  /* Griglia tecnica sottile — sfondi di sezioni e placeholder media. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(42 42 42 / 0.7) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(42 42 42 / 0.7) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+
+  /* Pattern a layer orizzontali — evoca la stampa FDM, colore solo bordo. */
+  .bg-layers {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0,
+      transparent 7px,
+      rgb(42 42 42 / 0.7) 7px,
+      rgb(42 42 42 / 0.7) 8px
+    );
+  }
+
+  /* Chevron "+" per l'accordion FAQ: ruota di 45° quando aperto. */
+  .faq-chevron {
+    transition: transform 0.2s ease;
+  }
+
+  details[open] .faq-chevron {
+    transform: rotate(45deg);
+  }
+
+  details > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+
+  details > summary::-webkit-details-marker {
+    display: none;
+  }
 }
