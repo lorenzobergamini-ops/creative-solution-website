@@ -40,12 +40,15 @@ export function Lightbox({
 
   const imageCount = images.length;
 
-  // Reset the position whenever the dialog reopens (or the opener changes).
-  useEffect(() => {
+  // Reset the position when the dialog (re)opens. React-documented pattern:
+  // adjust state during render instead of in an effect (no cascading renders).
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (prevOpen !== open) {
+    setPrevOpen(open);
     if (open) {
       setIndex(initialIndex);
     }
-  }, [open, initialIndex]);
+  }
 
   // Open/close the native dialog and lock the page scroll while open.
   useEffect(() => {

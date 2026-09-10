@@ -32,6 +32,9 @@ export function GalleryCard({
       <a
         href={detailHref}
         onClick={(event) => {
+          // Without images there is nothing to browse in the lightbox:
+          // follow the link to the detail page.
+          if (project.images.length === 0) return;
           event.preventDefault();
           setLightboxOpen(true);
         }}
