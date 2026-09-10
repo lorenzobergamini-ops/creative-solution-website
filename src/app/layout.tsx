@@ -1,6 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import "./globals.css";
 
 /**
@@ -20,9 +22,16 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Creative Solution",
+  title: {
+    default: "Creative Solution — Stampa 3D e contenuti maker",
+    template: "%s — Creative Solution",
+  },
   description:
-    "Creative Solution — stampa 3D e contenuti maker. Sito in costruzione.",
+    "Creative Solution — stampa 3D su richiesta, pezzi personalizzati, prototipi e progettazione. Richiedi un preventivo personalizzato.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#131313",
 };
 
 /**
@@ -45,7 +54,9 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       }
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        {children}
+        <Header />
+        <div className="flex flex-1 flex-col">{children}</div>
+        <Footer />
       </body>
     </html>
   );
