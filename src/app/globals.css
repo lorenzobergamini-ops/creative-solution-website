@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Creative Solution — Design system
+  --------------------------------
+  Tema scuro grafite di default, mobile-first.
+  Tutti i token sono CSS custom properties definiti qui e mappati in
+  tailwind.config.ts (colors + fontFamily). L'accent color è sovrascrivibile:
+  vedi src/app/layout.tsx (NEXT_PUBLIC_ACCENT_COLOR) e il README.
+*/
+
+:root {
+  /* Surfaces & chrome */
+  --background: #131313; /* grafite — sfondo pagina */
+  --surface: #1b1b1b;    /* card / sezioni */
+  --border: #2a2a2a;     /* bordi sottili */
+
+  /* Text */
+  --foreground: #f2eee4; /* bianco caldo */
+  --muted: #9b9b9b;      /* testo secondario */
+
+  /* Brand accent — DEFAULT: verde lime elettrico.
+     Override runtime: NEXT_PUBLIC_ACCENT_COLOR (layout.tsx)
+                       site_settings.accent_color (pannello admin, fasi M2+)
+     Alternativa documentata (NON applicata di default): arancione acceso
+     #F97316 — basta sovrascrivere --accent. */
+  --accent: #c8f031;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    height: 100%;
+  }
+
+  body {
+    @apply h-full bg-background font-sans text-foreground antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  }
+}
