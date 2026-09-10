@@ -19,6 +19,7 @@ const config: Config = {
         foreground: "var(--foreground)",
         muted: "var(--muted)",
         accent: "var(--accent)",
+        error: "var(--error)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
