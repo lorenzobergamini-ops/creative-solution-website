@@ -4,9 +4,11 @@ Sito ufficiale di **Creative Solution**, brand italiano di stampa 3D e contenuti
 maker/tecnologici. Repository del sito pubblico (home, servizi, galleria), form
 preventivo con upload file 3D, email di notifica e pannello admin privato.
 
-> **Stato attuale: fondamenta (Fase M0).** Nessuna pagina di contenuto è ancora
-> implementata: questo repository contiene scaffold, design system, configurazione
-> ambiente e migrazione database iniziale.
+> **Stato attuale: pagine pubbliche (fase M1).** Home, Servizi, Come funziona,
+> Contatti e Privacy sono implementate con il design system, header/footer
+> condivisi e `src/lib/site-settings.ts` (default configurabili). Mancano:
+> galleria collegata al database (M2), form preventivo (M3), email (M4) e
+> pannello admin (M5).
 
 ## Stack
 
