@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getLatestProjects } from "@/lib/gallery";
 import { getSiteSettings } from "@/lib/site-settings";
 import {
   ArrowRightIcon,
@@ -11,9 +12,10 @@ import {
 import {
   ButtonLink,
   Container,
-  MediaPlaceholder,
   SectionHeading,
 } from "@/components/ui";
+import { GalleryCard } from "@/components/gallery/GalleryCard";
+import { GalleryEmptyState } from "@/components/gallery/GalleryEmptyState";
 
 export const metadata: Metadata = {
   title: "Dalla tua idea a un oggetto reale",
@@ -62,8 +64,10 @@ const PROCESS_STEPS = [
   },
 ] as const;
 
-export default function Home() {
+export default async function Home() {
   const settings = getSiteSettings();
+  // Graceful: returns [] when Supabase is not configured (honest empty state).
+  const latestProjects = await getLatestProjects(6);
 
   return (
     <main>
@@ -189,33 +193,27 @@ export default function Home() {
       {/* ------------------------------------------------------------ */}
       <section className="border-b border-border">
         <Container className="flex flex-col gap-10 py-16 md:py-24">
-          <SectionHeading
-            eyebrow="Galleria"
-            title="Lavori recenti"
-            description="I progetti realizzati e pubblicati, in arrivo in questa sezione."
-          />
-
-          {/*
-            TODO(M2): connect this section to Supabase (gallery_projects +
-            gallery_images, published only, RLS public read) and render the
-            latest 6 published projects here. Until then, an honest empty
-            state — no fake projects.
-          */}
-          <div className="bg-grid border border-dashed border-border">
-            <div className="flex flex-col items-center gap-4 px-6 py-16 text-center">
-              <MediaPlaceholder className="h-40 w-40" label="Nessuna immagine" />
-              <p className="max-w-md text-sm leading-relaxed text-muted">
-                <span className="font-semibold text-foreground">
-                  Nessun progetto pubblicato ancora.
-                </span>{" "}
-                I lavori arriveranno presto — segui i profili social per non
-                perderti le novità.
-              </p>
-              <ButtonLink href="/galleria" variant="secondary">
-                Vai alla galleria
-              </ButtonLink>
-            </div>
+          <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+            <SectionHeading
+              eyebrow="Galleria"
+              title="Lavori recenti"
+              description="Gli ultimi progetti pubblicati sulla galleria."
+            />
+            <ButtonLink href="/galleria" variant="secondary" className="shrink-0">
+              Vedi tutti
+              <ArrowRightIcon className="h-4 w-4" />
+            </ButtonLink>
           </div>
+
+          {latestProjects.length === 0 ? (
+            <GalleryEmptyState />
+          ) : (
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {latestProjects.map((project) => (
+                <GalleryCard key={project.id} project={project} compact />
+              ))}
+            </div>
+          )}
         </Container>
       </section>
 
