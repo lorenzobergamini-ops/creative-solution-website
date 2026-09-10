@@ -4,13 +4,14 @@ Sito ufficiale di **Creative Solution**, brand italiano di stampa 3D e contenuti
 maker/tecnologici. Repository del sito pubblico (home, servizi, galleria), form
 preventivo con upload file 3D, email di notifica e pannello admin privato.
 
-> **Stato attuale: galleria collegata a Supabase (fase M2).** Le pagine
-> pubbliche (home, servizi, come funziona, contatti, privacy) e la galleria
-> pubblica (griglia, filtri per categoria, pagina dettaglio con lightbox
-> accessibile, sezione "Lavori recenti" in home) leggono i progetti
-> pubblicati da Supabase con fallback grazioso se le credenziali non sono
-> configurate. Mancano: form preventivo (M3), email (M4) e pannello admin
-> (M5).
+> **Stato attuale: form preventivo multi-step con upload sicuro (fase M3).**
+> Le pagine pubbliche (home, servizi, come funziona, contatti, privacy), la
+> galleria pubblica (M2) e il form preventivo multi-step (M3: 5 passaggi,
+> validazione Zod client+server, upload file 3D con signed URL verso un bucket
+> privato, Turnstile, rate limiting predisposto) sono implementati. Il flusso
+> completo verrà testato end-to-end quando saranno disponibili le credenziali
+> Supabase; senza credenziali tutto degrada con messaggi chiari e la build
+> resta verde. Mancano: email di notifica (M4) e pannello admin (M5).
 
 ## Stack
 
@@ -36,20 +37,27 @@ preventivo con upload file 3D, email di notifica e pannello admin privato.
 │   │   ├── globals.css     # design system (CSS variables + Tailwind)
 │   │   ├── layout.tsx      # root layout: font, metadati, accent override
 │   │   ├── page.tsx        # home (incl. "Lavori recenti" da Supabase)
+│   │   ├── actions/quote.ts  # server actions del form preventivo (M3)
+│   │   ├── preventivo/     # form preventivo multi-step (M3)
 │   │   ├── galleria/
 │   │   │   ├── page.tsx    # griglia progetti + filtri categoria
 │   │   │   └── [slug]/page.tsx  # dettaglio progetto + lightbox
 │   │   └── …               # servizi, come-funziona, contatti, privacy
 │   ├── components/
 │   │   ├── gallery/        # card, lightbox, filtri, empty state
+│   │   ├── quote/          # wizard preventivo + widget Turnstile (M3)
 │   │   └── …               # ui.tsx, Header, Footer, icons
 │   ├── lib/
-│   │   ├── supabase/       # client browser + client server (letture pubbliche)
+│   │   ├── supabase/       # client browser/server + client service-role (M3)
+│   │   ├── validations/quote.ts  # schema Zod condiviso (M3)
+│   │   ├── upload.ts       # limiti/validazione/path upload (M3)
+│   │   ├── turnstile.ts    # verifica token lato server (M3)
 │   │   ├── gallery.ts      # accesso dati galleria (M2)
 │   │   └── site-settings.ts
 ├── supabase/
 │   ├── migrations/
-│   │   └── 0001_init.sql   # schema iniziale: enum, tabelle, RLS, bucket
+│   │   ├── 0001_init.sql   # schema iniziale: enum, tabelle, RLS, bucket
+│   │   └── 0002_rate_limit.sql  # rate limiting form preventivo (M3)
 │   └── seed_demo.sql       # DATI DI ESEMPIO (da eliminare in produzione)
 ├── tailwind.config.ts      # mappa i colori/font alle CSS variables
 ├── postcss.config.mjs
@@ -169,13 +177,99 @@ Tutte le scelte non specificate nel brief, con motivazione.
   (`export const revalidate = 300`): i progetti pubblicati dal pannello admin
   appaiono senza bisogno di redeploy.
 
+## Form preventivo multi-step (fase M3)
+
+La pagina `/preventivo` implementa un wizard a 5 passaggi (contatti, progetto,
+file 3D, riferimenti visivi, riepilogo) con validazione Zod condivisa
+client+server, upload sicuro dei file 3D e degradazione senza credenziali.
+
+**Validazione (doppia, mai fidarsi del client)**
+
+- Schema condiviso: `src/lib/validations/quote.ts` (`quoteFormSchema` +
+  tipo `QuoteFormData`). Il client usa lo stesso schema (esteso con i campi
+  `File` transitori) via `zodResolver` per errori immediati in italiano;
+  ogni server action riesegue `safeParse` lato server e rifiuta input non
+  validi.
+- Condizione "file 3D o link Drive/WeTransfer": gestita nel wizard (schema
+  client con `superRefine`), il server la riapplica in `createSignedUploadUrls`
+  (la richiesta con `has_3d_file=true` senza file resta comunque visibile
+  all'admin in M5).
+
+**Flusso upload con signed URL (browser → bucket privato)**
+
+1. `createQuoteRequest(formData)` — valida, verifica Turnstile, applica il
+   rate limit e inserisce la riga in `quote_requests` con `status='new'`.
+2. `createSignedUploadUrls(quoteRequestId, files)` — rivalida ogni file
+   (estensione/MIME/dimensione contro `site_settings`, con default in
+   `src/lib/upload.ts`), verifica che la richiesta esista e sia `'new'`,
+   genera il percorso `quotes/{requestId}/{uuid}.{ext}` (mai il nome
+   originale nel percorso), emette una signed upload URL per file (60 min,
+   bucket privato `quote-files`) e inserisce le righe in `quote_files` con
+   `status='pending'`. L'azione è idempotente: una seconda chiamata elimina
+   le righe `pending` precedenti e riemette URL freschi (serve al retry).
+3. Il browser carica ogni file direttamente verso l'URL firmato (XHR con
+   barra di progresso per file, `Content-Type` dichiarato). Le operazioni
+   che richiedono il service role non passano MAI dal client: la chiave sta
+   solo nelle env server e i client browser non la vedono.
+4. `completeQuoteUpload(quoteRequestId, storagePaths)` — verifica su
+   storage che ogni oggetto esista (list della cartella), marca le righe
+   `quote_files` come `uploaded` e (TODO(M4), hook) attiva l'email di
+   notifica **senza allegati 3D** — le email M4 useranno solo link/ID.
+
+Se l'upload fallisce ma la richiesta è salvata, la UI mostra lo stato
+"parziale" con pulsante **Riprova upload** (riparte dal punto 2).
+
+**Turnstile (anti-bot)**
+
+- Client: il widget è renderizzato SOLO se `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+  è impostata; altrimenti compare un badge discreto "Protezione anti-bot non
+  configurata (modalità sviluppo)" — la chiave non viene mai inventata.
+- Server (`src/lib/turnstile.ts`): se `TURNSTILE_SECRET_KEY` manca,
+  `verifyTurnstileToken` restituisce `{ success: true, debug: 'not-configured' }`
+  (**modalità dev documentata**, TODO(M6): in produzione fallire chiuso);
+  se la chiave c'è ma il token manca o non supera `siteverify`, la richiesta
+  viene rifiutata.
+
+**Rate limiting (M3 semplice, TODO(M6) definitivo)** — migrazione
+`supabase/migrations/0002_rate_limit.sql`: tabella append-only
+`quote_rate_limits` (una riga per richiesta riuscita e per scope `email`/`ip`,
+hash sha256, nessun dato personale). Regole: max 3 richieste per email/24h e
+5 per IP/ora, contate con finestra scorrevole sulle righe; pulizia
+opportunistica delle righe oltre le 48h. Scelta documentata: un log
+append-only è più semplice e corretto di bucket aggregati (che richiedono
+upsert atomici) per l'M3; il rate limit definitivo (M6) lo sostituirà.
+
+**Limiti upload configurabili** — `MAX_FILE_SIZE_MB` (default 50) e
+`ALLOWED_MODEL_EXTENSIONS` sono in `src/lib/upload.ts`; il server legge
+`max_file_size_mb` e `allowed_file_extensions` da `site_settings` (seed in
+0001) quando esistono. La UI mostra i default statici (`getSiteSettings()`);
+il server è l'autorità e rifiuta i file non conformi all'emissione delle
+signed URL.
+
+**Operazioni manuali residue**
+
+- I bucket storage (`gallery` pubblico, `quote-files` privato) sono creati
+  idempotentemente da `0001_init.sql`; in alternativa creali dalla dashboard
+  (Storage → New bucket): `quote-files` **privato** e senza policy di
+  lettura anonima.
+- Applica le migrazioni (SQL Editor o `supabase db push`): ora servono sia
+  `0001_init.sql` sia `0002_rate_limit.sql`.
+- Per il test end-to-end servono le credenziali in `.env.local` (o Vercel):
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+  `SUPABASE_SERVICE_ROLE_KEY` e, per l'anti-bot,
+  `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (le chiavi
+  Turnstile si creano su dash.cloudflare.com).
+- TODO(M6): scansione antivirus/ZIP dei file caricati prima che l'admin li
+  apra (hook segnato in `src/lib/validations/quote.ts`).
+
 ## Database: migrazioni e seed
 
 **Migrazione** — `supabase/migrations/0001_init.sql` crea enum, tabelle,
-trigger, indici, policy RLS e bucket storage (in modo idempotente).
+trigger, indici, policy RLS e bucket storage (in modo idempotente);
+`0002_rate_limit.sql` aggiunge la tabella di rate limiting del form.
 Modo 1 (dashboard Supabase): progetto → **SQL Editor** → incolla il contenuto
-del file → **Run**. Modo 2 (Supabase CLI), dalla cartella del repo con il
-progetto linkato:
+dei file (in ordine) → **Run**. Modo 2 (Supabase CLI), dalla cartella del repo
+con il progetto linkato:
 
 ```bash
 supabase db push          # applica le migrazioni (deploy preview / remote)

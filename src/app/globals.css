@@ -27,6 +27,9 @@
      Alternativa documentata (NON applicata di default): arancione acceso
      #F97316 — basta sovrascrivere --accent. */
   --accent: #c8f031;
+
+  /* Stato errori (form preventivo, pannello admin) — avvisi su tema scuro. */
+  --error: #ff6b6b;
 }
 
 @layer base {
