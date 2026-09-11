@@ -7,8 +7,8 @@ import { CubeMark, InstagramIcon, TikTokIcon } from "@/components/icons";
  * Site footer: brand column, quick links, official social links and the
  * standard disclaimer. Server component — no state.
  */
-export default function Footer() {
-  const settings = getSiteSettings();
+export default async function Footer() {
+  const settings = await getSiteSettings();
   const year = new Date().getFullYear();
 
   return (

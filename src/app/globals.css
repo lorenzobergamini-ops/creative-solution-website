@@ -30,6 +30,13 @@
 
   /* Stato errori (form preventivo, pannello admin) — avvisi su tema scuro. */
   --error: #ff6b6b;
+
+  /* Semantica stati (pannello admin) — badge e indicatori.
+     Basati sulla palette di base, nessun gradiente/effetto. */
+  --status-info: #7dd3fc;   /* azzurro chiaro — in analisi, preventivo inviato */
+  --status-success: #4ade80; /* verde — accettata, completata */
+  --status-warn: #fbbf24;   /* ambra — attenzione */
+  --status-muted: #6b6b6b;  /* grigio — archiviata */
 }
 
 @layer base {

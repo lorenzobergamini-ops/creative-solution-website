@@ -42,8 +42,8 @@ const SERVICES = [
   },
 ] as const;
 
-export default function ServiziPage() {
-  const settings = getSiteSettings();
+export default async function ServiziPage() {
+  const settings = await getSiteSettings();
 
   return (
     <main>

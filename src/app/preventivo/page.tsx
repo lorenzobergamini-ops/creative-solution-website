@@ -20,7 +20,7 @@ export default async function PreventivoPage({
   searchParams: Promise<{ titolo?: string }>;
 }) {
   const { titolo } = await searchParams;
-  const settings = getSiteSettings();
+  const settings = await getSiteSettings();
 
   const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? null;
 
