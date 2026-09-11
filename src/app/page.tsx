@@ -65,7 +65,7 @@ const PROCESS_STEPS = [
 ] as const;
 
 export default async function Home() {
-  const settings = getSiteSettings();
+  const settings = await getSiteSettings();
   // Graceful: returns [] when Supabase is not configured (honest empty state).
   const latestProjects = await getLatestProjects(6);
 

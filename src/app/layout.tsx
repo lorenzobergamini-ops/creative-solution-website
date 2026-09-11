@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Inter, Space_Grotesk } from "next/font/google";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { getSiteSettings } from "@/lib/site-settings";
 import "./globals.css";
 
 /**
@@ -37,20 +38,23 @@ export const viewport: Viewport = {
 /**
  * Optional runtime accent override.
  * The default accent (#C8F031 electric lime) is defined as --accent in
- * globals.css. Setting NEXT_PUBLIC_ACCENT_COLOR (see .env.example) overrides
- * the CSS variable without touching the code. Documented alternative: #F97316.
+ * globals.css. Precedence: NEXT_PUBLIC_ACCENT_COLOR (env) > site_settings
+ * accent_color (admin panel) > default in globals.css. Documented
+ * alternative: #F97316.
  */
 const accentOverride = process.env.NEXT_PUBLIC_ACCENT_COLOR;
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const settings = await getSiteSettings();
+  const accent = accentOverride ?? settings.accentColor;
   return (
     <html
       lang="it"
       className={`${inter.variable} ${spaceGrotesk.variable} h-full antialiased`}
       style={
-        accentOverride
-          ? ({ "--accent": accentOverride } as CSSProperties)
-          : undefined
+        accent ? ({ "--accent": accent } as CSSProperties) : undefined
       }
     >
       <body className="flex min-h-full flex-col bg-background text-foreground">

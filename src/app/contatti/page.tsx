@@ -15,8 +15,8 @@ export const metadata: Metadata = {
     "Contatta Creative Solution: profili social ufficiali su Instagram e TikTok, email e WhatsApp. Per un preventivo usa il form dedicato.",
 };
 
-export default function ContattiPage() {
-  const settings = getSiteSettings();
+export default async function ContattiPage() {
+  const settings = await getSiteSettings();
 
   const emailNotConfigured = settings.contactEmail.length === 0;
   const whatsappNotConfigured = settings.contactWhatsapp.length === 0;

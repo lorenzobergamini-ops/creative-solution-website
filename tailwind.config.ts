@@ -20,6 +20,12 @@ const config: Config = {
         muted: "var(--muted)",
         accent: "var(--accent)",
         error: "var(--error)",
+        status: {
+          info: "var(--status-info)",
+          success: "var(--status-success)",
+          warn: "var(--status-warn)",
+          muted: "var(--status-muted)",
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],

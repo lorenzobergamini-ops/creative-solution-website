@@ -262,6 +262,60 @@ signed URL.
 - TODO(M6): scansione antivirus/ZIP dei file caricati prima che l'admin li
   apra (hook segnato in `src/lib/validations/quote.ts`).
 
+## Pannello admin (fase M5)
+
+Il pannello è su `/admin` (login `/admin/login`), protetto da Supabase Auth
+**senza registrazione pubblica**: gli account si creano manualmente.
+
+**1. Creare l'utente (dashboard Supabase)** → Authentication → Users → **Add
+user** → email + password (niente invite se non serve l'email di conferma).
+
+**2. Promuovere a admin (SQL Editor)** — il pannello verifica
+`profiles.role = 'admin'` (RLS: ogni utente legge solo la propria riga):
+
+```sql
+insert into public.profiles (id, role, full_name)
+values (
+  (select id from auth.users where email = 'tua@email.it' limit 1),
+  'admin',
+  'Samuele Bergamini'
+)
+on conflict (id) do nothing;
+```
+
+**3. Applicare le migrazioni** (`0001_init.sql` + `0002_rate_limit.sql`) e
+impostare in Vercel/`.env.local`: `NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+**Sicurezza delle route**
+
+- `src/middleware.ts` (Next 16: convenzione deprecata in favore di
+  `proxy.ts`, ancora supportata in 16.3.4; la migrazione è un rename di file
+  + `export function proxy`) protegge `/admin/*` e redirige gli utenti non
+  autenticati a `/admin/login?next=…` (asset root esclusi dal matcher).
+- Il layout del pannello `src/app/admin/(panel)/layout.tsx` è il gate
+  **server-side** autorevole (`dynamic = "force-dynamic"`): riverifica
+  sessione + ruolo via `getAdminSession()` (getUser() contro l'auth server +
+  query su `profiles`).
+- **Ogni** server action in `src/app/actions/admin.ts` ricomincia da
+  `requireAdmin()` (sessione + ruolo): il client non è mai fidato. I dati
+  privati (`quote_requests`, `quote_files`) si leggono/scrivono solo con la
+  service role key (RLS deny-by-default per anon/authenticated).
+- Download file: `getQuoteFileSignedUrl` genera URL firmati di 5 minuti sul
+  bucket privato `quote-files`. **Mai URL pubblici.**
+- Upload galleria: `uploadGalleryImage` carica lato server (service role)
+  verso `gallery/{projectId}/{uuid}.{ext}`; eliminazione con rollback
+  dell'oggetto storage.
+- Senza credenziali tutto degrada: le pagine admin mostrano l'empty state
+  onesto "Configurazione non disponibile" e la build resta verde.
+
+**Impostazioni** (`/admin/impostazioni`) — upsert su `site_settings`:
+`notifications_email` (destinatario notifiche M4), `accent_color` (con
+anteprima live; applicata al sito pubblico dal root layout con precedenza
+env > DB > default), social, contatti, materiali, estensioni e dimensione
+max upload. `getSiteSettings()` (src/lib/site-settings.ts) legge i valori
+dal DB con fallback ai default e le pagine pubbliche li usano.
+
 ## Database: migrazioni e seed
 
 **Migrazione** — `supabase/migrations/0001_init.sql` crea enum, tabelle,
