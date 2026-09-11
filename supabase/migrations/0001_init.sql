@@ -142,7 +142,7 @@ create table if not exists public.site_settings (
 -- to env vars at runtime, e.g. RESEND_FROM_EMAIL for notifications).
 insert into public.site_settings (key, value) values
   ('notifications_email', ''),
-  ('accent_color', '#C8F031'),
+  ('accent_color', '#38BDF8'),
   ('social_instagram', 'https://www.instagram.com/creativesolution.2024/'),
   ('social_tiktok', 'https://www.tiktok.com/@bergaminisamuele'),
   ('contact_email', ''),

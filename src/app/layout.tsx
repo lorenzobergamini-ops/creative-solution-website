@@ -37,10 +37,10 @@ export const viewport: Viewport = {
 
 /**
  * Optional runtime accent override.
- * The default accent (#C8F031 electric lime) is defined as --accent in
+ * The default accent (#38BDF8 light neon blue) is defined as --accent in
  * globals.css. Precedence: NEXT_PUBLIC_ACCENT_COLOR (env) > site_settings
  * accent_color (admin panel) > default in globals.css. Documented
- * alternative: #F97316.
+ * alternatives: #C8F031, #F97316.
  */
 const accentOverride = process.env.NEXT_PUBLIC_ACCENT_COLOR;
 
