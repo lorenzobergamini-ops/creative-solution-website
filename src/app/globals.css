@@ -21,12 +21,12 @@
   --foreground: #f2eee4; /* bianco caldo */
   --muted: #9b9b9b;      /* testo secondario */
 
-  /* Brand accent — DEFAULT: verde lime elettrico.
+  /* Brand accent — DEFAULT: blu chiaro neon (scelto dal proprietario).
      Override runtime: NEXT_PUBLIC_ACCENT_COLOR (layout.tsx)
-                       site_settings.accent_color (pannello admin, fasi M2+)
-     Alternativa documentata (NON applicata di default): arancione acceso
-     #F97316 — basta sovrascrivere --accent. */
-  --accent: #c8f031;
+                       site_settings.accent_color (pannello admin)
+     Alternative documentate (NON applicate di default): verde lime
+     #C8F031, arancione acceso #F97316 — basta sovrascrivere --accent. */
+  --accent: #38bdf8;
 
   /* Stato errori (form preventivo, pannello admin) — avvisi su tema scuro. */
   --error: #ff6b6b;

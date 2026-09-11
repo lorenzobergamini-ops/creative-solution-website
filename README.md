@@ -107,7 +107,7 @@ Tutte le scelte non specificate nel brief, con motivazione.
 - **Design system** — tema scuro grafite di default (niente `prefers-color-scheme`:
   il sito è scuro per scelta di brand, in tutte le modalità). Mobile-first:
   le utility Tailwind si scrivono base-mobile e si raffinano con prefissi `md:`/`lg:`.
-- **Accent color** — default verde lime elettrico `#C8F031` nella CSS variable
+- **Accent color** — default blu chiaro neon `#38BDF8` nella CSS variable
   `--accent` (globals.css). L'alternativa arancione `#F97316` è documentata nel
   CSS e nelle variabili d'ambiente ma **non** applicata di default. Override in
   ordine di precedenza: (1) variabile `NEXT_PUBLIC_ACCENT_COLOR` → inline style

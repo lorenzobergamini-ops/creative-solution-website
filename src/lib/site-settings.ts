@@ -42,7 +42,7 @@ export interface SiteSettings {
  */
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   notificationsEmail: "",
-  accentColor: "#C8F031",
+  accentColor: "#38BDF8",
   contactEmail: "",
   contactWhatsapp: "",
   socialInstagram: "https://www.instagram.com/creativesolution.2024/",

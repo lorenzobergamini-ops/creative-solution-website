@@ -65,7 +65,7 @@ const BRAND = {
   border: "#2A2E38",
   text: "#F5F1E8",
   muted: "#A8ADBB",
-  accent: "#C8F031",
+  accent: "#38BDF8",
 } as const;
 
 const CONTACT_PREFERENCE_LABELS: Record<string, string> = {
@@ -162,7 +162,7 @@ async function getEmailSiteSettings(): Promise<EmailSiteSettings> {
 }
 
 // ---------------------------------------------------------------------------
-// HTML templates (inline styles, brand dark + lime accent)
+// HTML templates (inline styles, brand dark + light blue accent)
 // ---------------------------------------------------------------------------
 
 interface ShellOptions {
