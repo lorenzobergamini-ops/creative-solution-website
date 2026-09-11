@@ -32,6 +32,10 @@ import {
   getAdminSupabaseClient,
   getQuoteUploadLimits,
 } from "@/lib/supabase/server-actions";
+import {
+  sendQuoteEmails,
+  type QuoteEmailData,
+} from "@/lib/emails";
 
 // ----------------------------------------------------------------
 // Rate limiting (M3 simple version — TODO(M6) definitive rate limit)
@@ -129,13 +133,26 @@ async function recordAttempt(
 }
 
 /**
- * TODO(M4): email notifications hook. Called after the whole upload flow
- * completes (request saved + every file uploaded). In M4 this will send the
- * admin notification via Resend WITHOUT any attachment (the 3D files are
- * never attached to emails — only links/IDs, per the technical analysis).
+ * Email notifications hook (M4). Called exactly ONCE per request, from the
+ * single reliable point: createQuoteRequest. Every request passes through
+ * createQuoteRequest exactly once, while completeQuoteUpload only runs when
+ * the client actually uploads files — so sending from here guarantees the
+ * admin notification and the client confirmation for file-less requests too,
+ * without ever doubling up.
+ *
+ * The emails never carry attachments (the 3D files stay in the private
+ * bucket; only the admin link/ID is sent) and never block the response:
+ * sendQuoteEmails already isolates every send in try/catch and logs
+ * failures. The outer try/catch below is a defensive backstop so an
+ * unexpected throw can never fail the quote submission.
  */
-async function notifyQuoteSubmitted(): Promise<void> {
-  // No-op until M4 (Resend + domain verification).
+async function notifyQuoteSubmitted(quote: QuoteEmailData): Promise<void> {
+  try {
+    await sendQuoteEmails(quote);
+  } catch (error) {
+    console.error("[quote] email notification failed:", error);
+    // TODO(M6): durable retry queue (failed sends are logged, not queued).
+  }
 }
 
 // ----------------------------------------------------------------
@@ -232,6 +249,26 @@ export async function createQuoteRequest(
 
   // 6. Record the attempt for rate limiting (best-effort).
   await recordAttempt(supabase, emailHash, ipHash, inserted.id);
+
+  // 7. Email notifications (M4): sent exactly once per request from this
+  //    single point, best-effort — failures are logged, never thrown, and
+  //    never block the client response.
+  await notifyQuoteSubmitted({
+    quoteRequestId: inserted.id,
+    clientName: data.clientName,
+    clientEmail: data.clientEmail,
+    clientPhone: data.clientPhone || undefined,
+    contactPreference: data.contactPreference,
+    projectTitle: data.projectTitle,
+    description: data.description,
+    quantity: data.quantity,
+    material: data.material || undefined,
+    color: data.color || undefined,
+    deadline: data.deadline || undefined,
+    notes: data.notes || undefined,
+    has3dFile: data.has3dFile,
+    driveLink: data.driveLink || undefined,
+  });
 
   return { ok: true, quoteRequestId: inserted.id };
 }
@@ -453,8 +490,10 @@ export async function completeQuoteUpload(
     };
   }
 
-  // Everything is in place: hook for M4 email notifications (no attachments).
-  await notifyQuoteSubmitted();
+  // Everything is in place. NOTE: the M4 email notifications are NOT sent
+  // here — they were already sent from createQuoteRequest (the single point,
+  // exactly once per request). Upload completion only marks files uploaded;
+  // emails never contain attachments anyway.
 
   return { ok: true, quoteRequestId };
 }

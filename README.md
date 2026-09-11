@@ -4,14 +4,17 @@ Sito ufficiale di **Creative Solution**, brand italiano di stampa 3D e contenuti
 maker/tecnologici. Repository del sito pubblico (home, servizi, galleria), form
 preventivo con upload file 3D, email di notifica e pannello admin privato.
 
-> **Stato attuale: form preventivo multi-step con upload sicuro (fase M3).**
+> **Stato attuale: M3+M4+M5 implementati (form preventivo, email di notifica,
+> pannello admin).**
 > Le pagine pubbliche (home, servizi, come funziona, contatti, privacy), la
-> galleria pubblica (M2) e il form preventivo multi-step (M3: 5 passaggi,
+> galleria pubblica (M2), il form preventivo multi-step (M3: 5 passaggi,
 > validazione Zod client+server, upload file 3D con signed URL verso un bucket
-> privato, Turnstile, rate limiting predisposto) sono implementati. Il flusso
-> completo verrà testato end-to-end quando saranno disponibili le credenziali
-> Supabase; senza credenziali tutto degrada con messaggi chiari e la build
-> resta verde. Mancano: email di notifica (M4) e pannello admin (M5).
+> privato, Turnstile, rate limiting), le email di notifica Resend (M4: notifica
+> admin + conferma cliente, senza allegati) e il pannello admin (M5: auth,
+> richieste, galleria, impostazioni) sono implementati. Il flusso completo
+> verrà testato end-to-end quando saranno disponibili le credenziali Supabase
+> e Resend; senza credenziali tutto degrada con messaggi chiari e la build
+> resta verde.
 
 ## Stack
 
@@ -52,6 +55,7 @@ preventivo con upload file 3D, email di notifica e pannello admin privato.
 │   │   ├── validations/quote.ts  # schema Zod condiviso (M3)
 │   │   ├── upload.ts       # limiti/validazione/path upload (M3)
 │   │   ├── turnstile.ts    # verifica token lato server (M3)
+│   │   ├── emails.ts       # email transazionali Resend (M4)
 │   │   ├── gallery.ts      # accesso dati galleria (M2)
 │   │   └── site-settings.ts
 ├── supabase/
@@ -112,10 +116,12 @@ Tutte le scelte non specificate nel brief, con motivazione.
 - **Font** — Inter (testo) e Space Grotesk (titoli) via `next/font/google`:
   caricati e auto-ottimizzati a build time, nessun `<link>` esterno. Variabili
   CSS `--font-sans` / `--font-display`, mappate in `tailwind.config.ts`.
-- **Fallback email notifiche** — il mittente/destinatario dei preventivi si
-  configura in `site_settings.notifications_email` dal pannello admin; finché il
-  valore è vuoto il sistema usa `RESEND_FROM_EMAIL` (env). Nessun allegato 3D
-  nelle email (solo link), come da analisi tecnica.
+- **Email notifiche (M4)** — mittente `RESEND_FROM_EMAIL` (dominio verificato
+  in Resend, SPF/DKIM); destinatario admin `site_settings.notifications_email`
+  dal pannello admin, con fallback a `RESEND_FROM_EMAIL` se vuoto. Ogni valore
+  utente è HTML-escaped prima di entrare nei template; nessun allegato 3D
+  nelle email (solo link/ID), come da analisi tecnica. Senza env l'invio è
+  saltato con un log e il form non si blocca mai.
 - **Schema database** — colonne non indicate esplicitamente come nullable nel
   brief sono `NOT NULL` dove sono campi obbligatori del form (`client_name`,
   `client_email`, `contact_preference`, `project_title`, `description`); i
@@ -212,9 +218,10 @@ client+server, upload sicuro dei file 3D e degradazione senza credenziali.
    che richiedono il service role non passano MAI dal client: la chiave sta
    solo nelle env server e i client browser non la vedono.
 4. `completeQuoteUpload(quoteRequestId, storagePaths)` — verifica su
-   storage che ogni oggetto esista (list della cartella), marca le righe
-   `quote_files` come `uploaded` e (TODO(M4), hook) attiva l'email di
-   notifica **senza allegati 3D** — le email M4 useranno solo link/ID.
+   storage che ogni oggetto esista (list della cartella) e marca le righe
+   `quote_files` come `uploaded`. Le email di notifica (M4) NON partono da
+   qui: vengono inviate una sola volta da `createQuoteRequest` (punto 1),
+   senza allegati 3D — solo link/ID (vedi sezione successiva).
 
 Se l'upload fallisce ma la richiesta è salvata, la UI mostra lo stato
 "parziale" con pulsante **Riprova upload** (riparte dal punto 2).
@@ -261,6 +268,56 @@ signed URL.
   Turnstile si creano su dash.cloudflare.com).
 - TODO(M6): scansione antivirus/ZIP dei file caricati prima che l'admin li
   apra (hook segnato in `src/lib/validations/quote.ts`).
+
+## Email di notifica (fase M4)
+
+Modulo `src/lib/emails.ts` (server-only, importato dalle server actions del
+form): email transazionali via **Resend** (pacchetto `resend`), template HTML
+inline brand dark+accent, senza dipendenze react-email. Ogni valore fornito
+dall'utente passa da `escapeHtml` prima di entrare nel template (mai input raw
+nell'HTML).
+
+**Quando partono** — una sola volta per richiesta, da `createQuoteRequest`
+(il punto unico del flusso: ogni richiesta ci passa esattamente una volta,
+mentre `completeQuoteUpload` gira solo se ci sono file da caricare). Un errore
+email non blocca mai il submit (try/catch separato, TODO(M6) coda di retry).
+
+1. **Notifica admin** — oggetto `Nuova richiesta di preventivo — {titolo}`;
+   destinatario `site_settings.notifications_email` (pannello admin →
+   Impostazioni) oppure, se vuoto, `RESEND_FROM_EMAIL`. Corpo: dati della
+   richiesta (nome, email, telefono se presente, preferenza di contatto,
+   materiale/colore/quantità, descrizione troncata) e link **"Apri nel
+   pannello"** → `{NEXT_PUBLIC_APP_URL}/admin/richieste/{id}` (path relativo
+   se l'URL non è configurato).
+2. **Conferma cliente** — oggetto `Abbiamo ricevuto la tua richiesta —
+   Creative Solution`; destinatario l'email del cliente. Contiene il
+   riferimento richiesta (`#XXXXXXXX`), un riepilogo essenziale e i link
+   social (Instagram/TikTok da `site_settings`). **Nessuna promessa di tempi
+   o prezzi**: solo "ti risponderemo al più presto con un preventivo
+   personalizzato".
+
+**Mai allegati**: i file 3D restano nel bucket privato `quote-files`; le
+email contengono solo link/ID (l'admin scarica i file con signed URL di 5
+minuti dal pannello).
+
+**Degradazione senza env**: se `RESEND_API_KEY` o `RESEND_FROM_EMAIL`
+mancano, l'invio viene saltato con un log (`{ok:false, reason:'not-configured'}`):
+la build resta verde e il submit del form non si blocca mai.
+
+**Configurazione Resend (prima della produzione)**
+
+1. Crea un account su resend.com e un'**API key** (resend.com/api-keys) →
+   valore in `RESEND_API_KEY` (env server, mai nel repo).
+2. **Verifica il dominio mittente** (resend.com/domains): aggiungi al DNS del
+   dominio i record **SPF e DKIM** indicati dalla dashboard Resend. Senza
+   verifica l'invio fallisce. Il mittente usato nelle email è
+   `RESEND_FROM_EMAIL` (es. `no-reply@dominio.it`).
+3. Imposta `RESEND_FROM_EMAIL` e, in produzione, `NEXT_PUBLIC_APP_URL`
+   (URL pubblico del sito, per i link assoluti nelle email).
+4. Destinatario notifiche: lascia `notifications_email` vuoto per usare
+   `RESEND_FROM_EMAIL`, oppure valorizzalo dal pannello admin
+   (Impostazioni → Email notifiche) per ricevere le notifiche su un'altra
+   casella.
 
 ## Pannello admin (fase M5)
 
