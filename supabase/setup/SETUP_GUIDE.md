@@ -30,12 +30,19 @@ del repository). Un team ti fornirà il contenuto completo da copiare.
 1. Nel menu laterale sinistro del dashboard clicca su **SQL Editor**.
 2. Clicca **New query** (nuova query).
 3. Incolla **l'INTERO contenuto** del file `cloud-setup.sql` nell'area di testo.
-   Non omettere nulla: lo script crea tabelle, regole di sicurezza, storage e
-   dati iniziali in un colpo solo.
+   Non omettere nulla: lo script crea tabelle, regole di sicurezza RLS e dati
+   iniziali in un colpo solo. Se alla fine compare un errore di permessi sugli
+   oggetti Storage (es. `42501: must be owner of table objects`), **ignoralo**:
+   le tabelle sono già state create correttamente — passa al punto 6.
 4. Clicca **Run** (Esegui).
 5. A fine esecuzione deve comparire il messaggio **Success** (in verde).
    Lo script è progettato per poter essere rieseguito in sicurezza: se per un
    motivo qualsiasi lo esegui una seconda volta, non dà errori.
+6. **Crea i 2 bucket Storage dall'interfaccia** (le versioni recenti di
+   Supabase non consentono di crearli via SQL). Menu **Storage** →
+   **New bucket**, due volte:
+   - nome `gallery` → attiva **Public bucket** (ON) → Create;
+   - nome `quote-files` → lascia **Public bucket** spento (privato) → Create.
 
 ## Passo 3 — Recuperare le 3 chiavi API
 
@@ -74,7 +81,7 @@ Dopo il Run dello script, controlla che tutto sia stato creato:
    - `gallery_images`
    - `site_settings` (contiene anche l'accento blu `#38BDF8` e i social)
    - `quote_rate_limits`
-2. **Storage** (menu laterale): devono comparire i bucket
+2. **Storage** (menu laterale): dopo il Passo 2.6 devono comparire i bucket
    - `gallery` (pubblico — contiene le foto della galleria)
    - `quote-files` (privato — contiene i file 3D caricati dai clienti)
 

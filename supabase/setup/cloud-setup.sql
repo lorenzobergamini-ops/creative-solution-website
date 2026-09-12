@@ -4,7 +4,7 @@
 -- SCOPO: crea in un'unica esecuzione tutto lo schema cloud del
 -- sito Creative Solution, combinando:
 --   1. la migrazione 0001_init.sql
---      (enum, tabelle, trigger, indici, policy RLS, bucket Storage)
+--      (enum, tabelle, trigger, indici, policy RLS su schema public)
 --   2. la migrazione 0002_rate_limit.sql (tabella quote_rate_limits)
 --
 -- In dettaglio crea:
@@ -15,12 +15,14 @@
 --              quote_rate_limits
 --   * funzione + trigger aggiornamento updated_at
 --   * indici di supporto alle query
---   * policy Row Level Security (RLS)
---   * bucket Storage: gallery (publico) e quote-files (privato)
+--   * policy Row Level Security (RLS) sulle tabelle public
+--   * I bucket Storage (gallery, quote-files) si creano dal
+--     dashboard (Storage -> New bucket), NON via SQL (vedi sotto)
 --
 -- IDEMPOTENTE: puo' essere eseguito due volte senza errori.
 -- Uso: aprire SQL Editor sul progetto Supabase -> New query ->
 -- incollare l'INTERO contenuto di questo file -> Run.
+-- Dopo il Run: creare i 2 bucket dall'interfaccia Storage.
 -- ============================================================
 
 -- ============================================================
@@ -274,35 +276,17 @@ create policy "site_settings_select_authenticated"
   using (true);
 
 -- ------------------------------------------------------------
--- Storage
--- ------------------------------------------------------------
--- Buckets (idempotent via on conflict do nothing; alternative: create
--- manually from the dashboard, see README). 'gallery' is public,
--- 'quote-files' is private.
-insert into storage.buckets (id, name, public)
-values ('gallery', 'gallery', true)
-on conflict (id) do nothing;
-
-insert into storage.buckets (id, name, public)
-values ('quote-files', 'quote-files', false)
-on conflict (id) do nothing;
-
--- Storage RLS is enabled by default on Supabase; keep it explicit.
-alter table storage.objects enable row level security;
-
--- gallery bucket: public read (anon + authenticated).
--- Writes are NOT covered by any policy: anon/authenticated cannot
--- insert/update/delete — all writes happen with service_role only.
-drop policy if exists "gallery_objects_select_public" on storage.objects;
-create policy "gallery_objects_select_public"
-  on storage.objects
-  for select to anon, authenticated
-  using (bucket_id = 'gallery');
-
--- quote-files bucket: no public policies at all — stays private.
--- Access only via signed URLs issued server-side with service_role.
--- (Intentionally no policy statements for this bucket.)
-
+-- Storage: NON creabile via SQL nelle versioni recenti di
+-- Supabase (storage.* e' di proprieta' di supabase_storage_admin;
+-- il ruolo postgres riceve "42501: must be owner of table objects").
+-- Creare i 2 bucket dall'interfaccia (Storage -> New bucket):
+--   1. name "gallery"      -> Public bucket: ON
+--   2. name "quote-files"  -> Public bucket: OFF (privato)
+-- NOTA: un bucket pubblico e' leggibile da chiunque tramite la
+-- public URL, senza policy su storage.objects: la lettura della
+-- galleria funziona senza ulteriori passaggi. Le scritture
+-- avvengono solo con service_role (bypassa RLS).
+-- ============================================================
 -- ============================================================
 -- PARTE 2/2 — supabase/migrations/0002_rate_limit.sql
 -- (gia' pienamente idempotente: create table/index if not exists
